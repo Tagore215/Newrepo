@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: finalcheckcontainers.azurecr.io
+        username: ${{ secrets.acr_finalcheckcontainers_username }}
+        password: ${{ secrets.acr_finalcheckcontainers_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/OrderItemWebAPI" -f  "OrderItemWebAPI/Dockerfile" -t finalcheckcontainers.azurecr.io/finalcheckclusters:${{ github.sha }} --label dockerfile-path=OrderItemWebAPI/Dockerfile
+        docker push finalcheckcontainers.azurecr.io/finalcheckclusters:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_finalcheckclusters_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep finalcheckclusters9dde | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace finalcheckclusters9dde`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: finalcheckclusters9dde
+        container-registry-url: finalcheckcontainers.azurecr.io
+        container-registry-username: ${{ secrets.acr_finalcheckcontainers_username }}
+        container-registry-password: ${{ secrets.acr_finalcheckcontainers_password }}
+        secret-name: finalcheckcldockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: finalcheckclusters9dde
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          finalcheckcontainers.azurecr.io/finalcheckclusters:${{ github.sha }}
+        imagepullsecrets: |
+          finalcheckcldockerauth
