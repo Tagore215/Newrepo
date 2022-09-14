@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "finalcheckclusters-b872"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "finalcheckclusters-b872"
+  template:
+    metadata:
+      labels:
+        app: "finalcheckclusters-b872"
+    spec:
+      containers:
+        - name: "finalcheckclusters-b872"
+          image: "finalcheckcontainers.azurecr.io/finalcheckclusters"
+          ports:
+          - containerPort: 80
